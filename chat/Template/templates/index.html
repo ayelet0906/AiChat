@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>צ'אט GPT - {{ domain }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🤖 צ'אט GPT</h1>
+            <p class="domain-info">תחום מוגבל: <strong>{{ domain }}</strong></p>
+            <button id="clearBtn" class="clear-btn">🗑️ נקה שיחה</button>
+        </header>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <h2>ברוכים הבאים! 👋</h2>
+                <p>אני עוזר AI המתמחה ב{{ domain }}.</p>
+                <p>שאל אותי כל שאלה בתחום זה ואשמח לעזור!</p>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <textarea 
+                id="messageInput" 
+                placeholder="הקלד את השאלה שלך כאן..."
+                rows="3"
+            ></textarea>
+            <button id="sendBtn" class="send-btn">
+                <span>שלח</span>
+                <span class="icon">📤</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const clearBtn = document.getElementById('clearBtn');
+
+        // פונקציה להוספת הודעה לצ'אט
+        function addMessage(content, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            
+            const icon = document.createElement('div');
+            icon.className = 'message-icon';
+            icon.textContent = isUser ? '👤' : '🤖';
+            
+            const text = document.createElement('div');
+            text.className = 'message-text';
+            text.textContent = content;
+            
+            messageDiv.appendChild(icon);
+            messageDiv.appendChild(text);
+            chatContainer.appendChild(messageDiv);
+            
+            // גלילה לתחתית
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // פונקציה להוספת הודעת טעינה
+        function addLoadingMessage() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message bot-message loading-message';
+            loadingDiv.id = 'loadingMessage';
+            
+            const icon = document.createElement('div');
+            icon.className = 'message-icon';
+            icon.textContent = '🤖';
+            
+            const text = document.createElement('div');
+            text.className = 'message-text';
+            text.innerHTML = '<div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>';
+            
+            loadingDiv.appendChild(icon);
+            loadingDiv.appendChild(text);
+            chatContainer.appendChild(loadingDiv);
+            
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // פונקציה להסרת הודעת טעינה
+        function removeLoadingMessage() {
+            const loadingMsg = document.getElementById('loadingMessage');
+            if (loadingMsg) {
+                loadingMsg.remove();
+            }
+        }
+
+        // פונקציה לשליחת הודעה
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // הוספת הודעת המשתמש
+            addMessage(message, true);
+            messageInput.value = '';
+            sendBtn.disabled = true;
+
+            // הוספת הודעת טעינה
+            addLoadingMessage();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                const data = await response.json();
+                
+                // הסרת הודעת טעינה
+                removeLoadingMessage();
+
+                if (response.ok) {
+                    addMessage(data.response, false);
+                } else {
+                    addMessage('שגיאה: ' + (data.error || 'אירעה שגיאה לא צפויה'), false);
+                }
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('שגיאה בתקשורת עם השרת: ' + error.message, false);
+            }
+
+            sendBtn.disabled = false;
+            messageInput.focus();
+        }
+
+        // פונקציה לניקוי השיחה
+        async function clearChat() {
+            if (!confirm('האם אתה בטוח שברצונך לנקות את השיחה?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/clear', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    chatContainer.innerHTML = `
+                        <div class="welcome-message">
+                            <h2>ברוכים הבאים! 👋</h2>
+                            <p>אני עוזר AI המתמחה ב{{ domain }}.</p>
+                            <p>שאל אותי כל שאלה בתחום זה ואשמח לעזור!</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                alert('שגיאה בניקוי השיחה: ' + error.message);
+            }
+        }
+
+        // אירועים
+        sendBtn.addEventListener('click', sendMessage);
+        clearBtn.addEventListener('click', clearChat);
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // פוקוס על תיבת הטקסט בטעינה
+        messageInput.focus();
+    </script>
+</body>
+</html>
